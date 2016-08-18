@@ -2,7 +2,7 @@ alias Experimental.GenStage
 
 defmodule GenStageExample3 do
 
-  defmodule Split do
+  defmodule Splitter do
     @moduledoc """
     This GenStage example is meant to illustrate the splitting of an output flow of
     events - a list of integers - to more than one stage. This is accomplished by
@@ -16,13 +16,13 @@ defmodule GenStageExample3 do
       {:producer_consumer, %{},
         dispatcher: {GenStage.PartitionDispatcher,
                       partitions: 2,
-                      hash: &splitter/2}}
+                      hash: &split/2}}
     end
 
     @doc """
     The "hash function"
     """
-    def splitter(event, no_of_partitions ) do
+    def split(event, no_of_partitions ) do
       {event, rem(event, no_of_partitions)}
     end
 
@@ -46,14 +46,14 @@ defmodule GenStageExample3 do
     end
   end
 
-  {:ok, inport} = GenStage.from_enumerable(1..10)
-  {:ok, split}  = GenStage.start_link(Split, 0)
-  {:ok, evens}  = GenStage.start_link(Ticker, {2_000, :evens})
-  {:ok, odds}   = GenStage.start_link(Ticker, {2_000, :odds})
+  {:ok, inport}    = GenStage.from_enumerable(1..10)
+  {:ok, splitter}  = GenStage.start_link(Splitter, 0)
+  {:ok, evens}     = GenStage.start_link(Ticker, {2_000, :evens})
+  {:ok, odds}      = GenStage.start_link(Ticker, {2_000, :odds})
 
-  GenStage.sync_subscribe(evens, to: split, partition: 0, max_demand: 1)
-  GenStage.sync_subscribe(odds,  to: split, partition: 1, max_demand: 1)
-  GenStage.sync_subscribe(split, to: inport, max_demand: 1)
+  GenStage.sync_subscribe(evens, to: splitter, partition: 0, max_demand: 1)
+  GenStage.sync_subscribe(odds,  to: splitter, partition: 1, max_demand: 1)
+  GenStage.sync_subscribe(splitter, to: inport, max_demand: 1)
 
   Process.sleep(:infinity)
 
